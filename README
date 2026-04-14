@@ -1,0 +1,45 @@
+# Install dependencies
+pip install -r requirements.txt
+
+# Add your API key to .env
+# ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Start the server
+uvicorn app.main:app --reload
+
+# Don't forget to turn on VPN on the region that doesn't support your LLM
+
+# pip install --upgrade anthropic
+
+
+# app/main.py
+────────────
+Simple FastAPI backend: Text → Graph
+
+Endpoints:
+  POST /generate   — submit text, get diagram graph back immediately
+  GET  /results    — list all past results (stored in memory)
+  GET  /result/{job_id} — get a specific past result
+  GET  /health     — health check
+
+Storage: simple in-memory dict (resets on server restart).
+No queue, no database, no background tasks — runs synchronously.
+
+
+# planner
+──────────────────────
+Multi-provider LLM agent. Supports:
+  - Google Gemini  (free)
+  - Groq           (free)
+  - Ollama         (local, free)
+  - Anthropic      (paid)
+
+Provider is selected by LLM_PROVIDER in .env
+
+
+# app/agents/chart_planner.py
+────────────────────────────
+Extracts structured chart data from text using the configured LLM provider.
+Returns a chart spec: { chart_type, title, x_label, y_label, data: [{label, value}] }
+
+
