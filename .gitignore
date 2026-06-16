@@ -1,0 +1,12 @@
+.env
+#package-lock.json
+/dist
+/src/dist
+/node_modules
+**/.DS_Store
+.idea/*
+*.log
+/app/__pycache__
+/app/agents/__pycache__
+/app/prompts/__pycache__
+venv
