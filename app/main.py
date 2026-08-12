@@ -12,6 +12,10 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 
+import os
+print("GROQ_BASE_URL:", os.environ.get("GROQ_BASE_URL"))
+print("OPENAI_BASE_URL:", os.environ.get("OPENAI_BASE_URL"))
+
 # ── In-memory store ────────────────────────────────────────────────────────
 _results: dict[str, dict[str, Any]] = {}
 

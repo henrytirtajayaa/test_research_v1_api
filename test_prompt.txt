@@ -1,0 +1,402 @@
+=== TESTING prompts 
+
+#### TESTING 01 #### C++ Bellman-Ford Implementation (Negative Weights)
+
+void bellmanFord(int V, int E, int src, vector<Edge>& edges) {
+    vector<int> dist(V, 1e9);
+    dist[src] = 0;
+
+    for (int i = 1; i <= V - 1; i++) {
+        for (int j = 0; j < E; j++) {
+            int u = edges[j].u;
+            int v = edges[j].v;
+            int w = edges[j].weight;
+            if (dist[u] != 1e9 && dist[u] + w < dist[v]) {
+                dist[v] = dist[u] + w;
+            }
+        }
+    }
+
+    for (int i = 0; i < E; i++) {
+        int u = edges[i].u;
+        int v = edges[i].v;
+        int w = edges[i].weight;
+        if (dist[u] != 1e9 && dist[u] + w < dist[v]) {
+            cout << "Graph contains negative weight cycle" << endl;
+            return;
+        }
+    }
+}
+
+
+* **Expected Result**: `algorithm: "bellman_ford"`, `graph_type: "shortest_path"`, `data_source: "synthesized"`, `input_format: "real_code"`.
+
+=======================================================
+
+#### TESTING 02 #### Rust Kruskal Implementation (Disjoint Set Union)
+
+struct UnionFind {
+    parent: Vec<usize>,
+}
+
+impl UnionFind {
+    fn new(n: usize) -> Self {
+        UnionFind { parent: (0..n).collect() }
+    }
+    fn find(&mut self, i: usize) -> usize {
+        if self.parent[i] == i { i }
+        else {
+            self.parent[i] = self.find(self.parent[i]);
+            self.parent[i]
+        }
+    }
+    fn union(&mut self, i: usize, j: usize) -> bool {
+        let root_i = self.find(i);
+        let root_j = self.find(j);
+        if root_i != root_j {
+            self.parent[root_i] = root_j;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+pub fn kruskal(v: usize, mut edges: Vec<(usize, usize, i32)>) -> i32 {
+    edges.sort_by_key(|k| k.2);
+    let mut uf = UnionFind::new(v);
+    let mut mst_weight = 0;
+    for (u, v, w) in edges {
+        if uf.union(u, v) {
+            mst_weight += w;
+        }
+    }
+    mst_weight
+}
+
+
+* **Expected Result**: `algorithm: "kruskal"`, `graph_type: "force_directed"`, `data_source: "synthesized"`, `input_format: "real_code"`.
+
+=======================================================
+
+#### TESTING 03 #### Go PageRank Implementation (Iterative Score Vector)
+
+package main
+
+func calculatePageRank(nodes []string, adjMap map[string][]string, damping float64, iterations int) map[string]float64 {
+	N := float64(len(nodes))
+	ranks := make(map[string]float64)
+	for _, node := range nodes {
+		ranks[node] = 1.0 / N
+	}
+
+	for it := 0; it < iterations; it++ {
+		newRanks := make(map[string]float64)
+		for _, node := range nodes {
+			newRanks[node] = (1.0 - damping) / N
+		}
+		for u, neighbors := range adjMap {
+			if len(neighbors) > 0 {
+				share := ranks[u] / float64(len(neighbors))
+				for _, v := range neighbors {
+					newRanks[v] += damping * share
+				}
+			}
+		}
+		ranks = newRanks
+	}
+	return ranks
+}
+
+
+* **Expected Result**: `algorithm: "pagerank"`, `graph_type: "force_directed"`, `data_source: "synthesized"`, `input_format: "real_code"`.
+
+=======================================================
+
+#### TESTING 04 #### "Zachary's Karate Club Graph (Social Network) with Community Detection"
+
+import networkx as nx
+
+# Initialize Zachary's Karate Club graph
+G = nx.karate_club_graph()
+
+# Edges representing friendship network inside the club
+# The network naturally splits into 2 factions after a dispute between Officer (33) and Mr. Hi (0)
+
+# Detect communities using Louvain modularity algorithm
+# and group nodes into their respective factions.
+
+=======================================================
+
+#### TESTING 05 #### Minimum Cost Connect Cities (LeetCode 1135 Style)
+
+There are N cities numbered from 1 to N. You are given connections, where connections[i] = [city1, city2, cost] represents the cost to connect city1 and city2 together. A connection is bidirectional. Return the minimum cost to connect all the cities such that there is at least one path between any two cities. If it is impossible to connect all the cities, return -1.
+
+
+* **Expected Result**: `algorithm: "kruskal"` or `"prim"`, `graph_type: "force_directed"`, `data_source: "synthesized"`, `input_format: "natural_language_problem"`.
+
+=======================================================
+
+#### TESTING 06 #### All-Pairs Shortest Latency Matrix (Floyd-Warshall Problem)
+
+A global distributed system consists of V data centers. We need to evaluate the signal propagation delay between every pair of data centers in the network. Given a directed weighted communication graph, construct a V x V matrix storing the minimum transit time required for a packet to travel between any source vertex u and destination vertex v.
+
+
+* **Expected Result**: `algorithm: "floyd"`, `graph_type: "heatmap"`, `data_source: "synthesized"`, `input_format: "natural_language_problem"`.
+
+
+=======================================================
+
+#### TESTING 07 #### Bank Fraud Network Detection
+
+Financial auditors identified suspicious wire transfers among accounts:
+Account_101 transferred 50000 USD to Account_204.
+Account_204 transferred 48000 USD to Account_309 and 2000 USD to Account_112.
+Account_309 transferred 47000 USD to Account_501.
+Account_501 transferred 45000 USD to Account_101.
+Account_112 transferred 1500 USD to Account_808.
+Account_808 transferred 1200 USD to Account_112.
+
+Find money laundering circular flows and community clusters in this transfer network.
+
+
+* **Expected Result**: `algorithm: "community"`, `graph_type: "force_directed"`, `directed: true`, `data_source: "extracted"`, `input_format: "explicit_data"`.
+
+=======================================================
+
+#### TESTING 08 ####
+# Prompt testing
+
+#1
+function dijkstra(graph, start) {
+    const distances = {};
+    const visited = new Set();
+    const pq = new MinPriorityQueue({ priority: x => x.dist });
+
+    for (const node in graph) distances[node] = Infinity;
+    distances[start] = 0;
+    pq.enqueue({ node: start, dist: 0 });
+
+    while (!pq.isEmpty()) {
+        const { node, dist } = pq.dequeue();
+        if (visited.has(node)) continue;
+        visited.add(node);
+
+        for (const [neighbor, weight] of graph[node]) {
+            const newDist = dist + weight;
+            if (newDist < distances[neighbor]) {
+                distances[neighbor] = newDist;
+                pq.enqueue({ node: neighbor, dist: newDist });
+            }
+        }
+    }
+    return distances;
+}
+
+# 2 https://www.geeksforgeeks.org/problems/implementing-dijkstra-set-1-adjacency-matrix/1
+Given an undirected, weighted graph with V vertices numbered from 0 to V-1
+and E edges, represented by 2d array edges[][], where edges[i]=[u, v, w]
+represents the edge between the nodes u and v having w edge weight.
+Find the shortest distance of all the vertices from the source vertex src,
+and return an array of integers where the ith element denotes the shortest
+distance between ith node and source vertex src.
+
+# TESTING simple context
+in the Computer Science class for Masters degree, there are 12 students, 1 from Indonesia, 1 from Russia, 1 from Japan, 3 from Africa, 1 from Slovakia, and the rest are from China
+
+Hospital patient distribution by age group:
+- 0-18 years: 145 patients
+- 19-35 years: 320 patients
+- 36-50 years: 285 patients
+- 51-65 years: 210 patients
+- 65+ years: 165 patients
+Show the age distribution of our patients.
+
+# TESTING Dijkstra
+graph = {
+    'Jakarta':   {'Bandung': 150, 'Semarang': 450, 'Surabaya': 800},
+    'Bandung':   {'Jakarta': 150, 'Yogyakarta': 310, 'Semarang': 370},
+    'Semarang':  {'Jakarta': 450, 'Bandung': 370, 'Surabaya': 310, 'Yogyakarta': 130},
+    'Yogyakarta':{'Bandung': 310, 'Semarang': 130, 'Surabaya': 320, 'Malang': 200},
+    'Surabaya':  {'Jakarta': 800, 'Semarang': 310, 'Yogyakarta': 320, 'Malang': 90},
+    'Malang':    {'Yogyakarta': 200, 'Surabaya': 90}
+}
+source = 'Jakarta'
+target = 'Malang'
+Find the shortest route from Jakarta to Malang using Dijkstra algorithm.
+
+# TESTING Social Network
+nodes = [
+    {"id": "Alice",   "group": "AI"},
+    {"id": "Bob",     "group": "AI"},
+    {"id": "Charlie", "group": "DB"},
+    {"id": "Diana",   "group": "DB"},
+    {"id": "Eve",     "group": "CV"},
+    {"id": "Frank",   "group": "CV"},
+    {"id": "Grace",   "group": "AI"},
+    {"id": "Henry",   "group": "DB"},
+    {"id": "Ivan",    "group": "CV"},
+    {"id": "Julia",   "group": "AI"}
+]
+
+edges = [
+    ("Alice",   "Bob",     3),
+    ("Alice",   "Grace",   5),
+    ("Alice",   "Julia",   4),
+    ("Bob",     "Charlie", 2),
+    ("Bob",     "Diana",   1),
+    ("Charlie", "Diana",   6),
+    ("Charlie", "Henry",   3),
+    ("Diana",   "Henry",   4),
+    ("Eve",     "Frank",   5),
+    ("Eve",     "Ivan",    3),
+    ("Frank",   "Ivan",    2),
+    ("Grace",   "Julia",   4),
+    ("Henry",   "Ivan",    2),
+    ("Alice",   "Eve",     1),
+    ("Bob",     "Frank",   1)
+]
+
+Show the research collaboration network and detect communities.
+
+# TESTING Social Network
+In the Computer Science Masters program, 12 students collaborate on research:
+
+Student info:
+- Henry (Indonesia)  - research: AI Visualization
+- Wei (China)        - research: Graph Neural Networks
+- Li (China)         - research: Graph Neural Networks
+- Zhang (China)      - research: Database Systems
+- Chen (China)       - research: Database Systems
+- Liu (China)        - research: Computer Vision
+- Yuki (Japan)       - research: Computer Vision
+- Ivan (Russia)      - research: Cybersecurity
+- Petra (Slovakia)   - research: Cybersecurity
+- Kwame (Africa)     - research: NLP
+- Amara (Africa)     - research: NLP
+- Kofi (Africa)      - research: AI Visualization
+
+Collaboration pairs (worked on papers together):
+Henry-Wei (5 papers), Henry-Yuki (3), Henry-Kofi (4), Henry-Kwame (2),
+Wei-Li (6), Wei-Zhang (4), Wei-Henry (5),
+Li-Zhang (3), Li-Liu (2),
+Zhang-Chen (5), Zhang-Liu (2),
+Chen-Liu (3),
+Liu-Yuki (4),
+Yuki-Henry (3),
+Ivan-Petra (6), Ivan-Wei (1),
+Petra-Zhang (2),
+Kwame-Amara (5), Kwame-Kofi (3),
+Amara-Kofi (4), Amara-Henry (2)
+
+Visualize the collaboration network. Detect research communities.
+Edge weight = number of co-authored papers.
+
+# TESTING Edge List
+Internet router topology (edge list with latency in ms):
+
+Routers: R1, R2, R3, R4, R5, R6, R7, R8
+
+Connections:
+R1 - R2 : 5ms
+R1 - R3 : 8ms
+R2 - R4 : 3ms
+R2 - R5 : 6ms
+R3 - R5 : 4ms
+R3 - R6 : 9ms
+R4 - R7 : 7ms
+R5 - R7 : 5ms
+R5 - R8 : 6ms
+R6 - R8 : 3ms
+R7 - R8 : 4ms
+
+Find shortest latency path from R1 to R8.
+Visualize the full router network with edge weights.
+
+# TESTING Community Detection
+Twitter-like follower influence network (directed):
+
+Influencer connections:
+TechGuru    → CodeNinja, DataWiz, AIResearcher, StartupCEO
+CodeNinja   → TechGuru, OpenSourceDev, WebDev
+DataWiz     → TechGuru, AIResearcher, MLEngineer, DataScientist
+AIResearcher→ DataWiz, MLEngineer, DeepLearner
+StartupCEO  → TechGuru, InvestorA, ProductMgr
+OpenSourceDev→ CodeNinja, WebDev, DevOpsGuy
+WebDev      → CodeNinja, UIDesigner, FrontendDev
+MLEngineer  → DataWiz, AIResearcher, DeepLearner, DataScientist
+DataScientist→ DataWiz, MLEngineer, StatisticsProf
+DeepLearner → AIResearcher, MLEngineer
+InvestorA   → StartupCEO, ProductMgr
+ProductMgr  → StartupCEO, UIDesigner
+UIDesigner  → WebDev, FrontendDev
+FrontendDev → WebDev, UIDesigner
+DevOpsGuy   → OpenSourceDev, CodeNinja
+StatisticsProf→ DataScientist, DataWiz
+
+Calculate PageRank to find the most influential accounts.
+Detect communities (tech clusters).
+
+# Floyd Warshall
+Distance matrix for network nodes A, B, C, D, E:
+
+       A     B     C     D     E
+A  [   0,    3,  INF,    7,  INF ]
+B  [   8,    0,    2,  INF,  INF ]
+C  [   5,  INF,    0,    1,  INF ]
+D  [   2,  INF,  INF,    0,    3 ]
+E  [ INF,  INF,    4,  INF,    0 ]
+
+Apply Floyd-Warshall algorithm to find shortest distances between ALL pairs of nodes.
+Show the result as a heatmap.
+
+# TESTING Kruskal - Minimum Spanning Tree
+We need to connect 6 office buildings with network cables.
+The cost (meters of cable) between each pair:
+
+Edges (building1, building2, cable_length):
+(HQ,    Finance,   10)
+(HQ,    IT,         6)
+(HQ,    HR,         5)
+(Finance, IT,       15)
+(Finance, HR,       8)
+(Finance, Sales,    12)
+(IT,    HR,          4)
+(IT,    Sales,       9)
+(HR,    Sales,      11)
+(Sales, Warehouse,   7)
+(IT,    Warehouse,  13)
+
+Find the Minimum Spanning Tree to connect all buildings with minimum cable.
+Use Kruskal's algorithm.
+
+# TESTING BFS
+Social media friend graph (starting from User1):
+
+User1 follows: User2, User3, User4
+User2 follows: User5, User6
+User3 follows: User7, User8
+User4 follows: User9
+User5 follows: User10, User11
+User6 follows: User12
+User7 follows: User13
+
+Apply BFS starting from User1.
+Show the traversal order and tree structure — this is how friend recommendations work.
+
+# TESTING Hierarchy
+University organizational hierarchy:
+
+Rector manages: VP_Academic, VP_Finance, VP_Student
+
+VP_Academic manages: Dean_Engineering, Dean_Science, Dean_Business
+VP_Finance manages: Budget_Office, Procurement
+VP_Student manages: Student_Affairs, Career_Center, Counseling
+
+Dean_Engineering manages: CS_Dept, EE_Dept, ME_Dept
+Dean_Science manages: Physics_Dept, Math_Dept, Chemistry_Dept
+Dean_Business manages: MBA_Program, Finance_Dept
+
+CS_Dept manages: Prof_AI, Prof_DB, Prof_SE
+
+Visualize this university organizational hierarchy as a tree.
