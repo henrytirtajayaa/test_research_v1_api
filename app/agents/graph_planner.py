@@ -38,8 +38,10 @@ def _extract_json(text: str) -> dict:
 
 def _validate(raw: dict) -> dict:
     VALID_GRAPH_TYPES = {"force_directed", "shortest_path", "tree", "dag", "heatmap"}
-    VALID_ALGORITHMS  = {"dijkstra", "bfs", "dfs", "kruskal", "pagerank",
-                         "community", "topological", "floyd", "none"}
+    VALID_ALGORITHMS  = {"dijkstra", "bellman_ford", "bfs", "dfs", "kruskal", "prim",
+                         "pagerank", "community", "topological", "floyd", "none"}
+    VALID_DATA_SOURCE = {"extracted", "synthesized"}
+    VALID_INPUT_FORMAT = {"explicit_data", "pseudocode", "real_code", "natural_language_problem"}
 
     graph_type = raw.get("graph_type", "force_directed")
     if graph_type not in VALID_GRAPH_TYPES:
@@ -49,7 +51,17 @@ def _validate(raw: dict) -> dict:
     if algorithm not in VALID_ALGORITHMS:
         algorithm = "none"
 
-    # Validate nodes
+    data_source = raw.get("data_source", "extracted")
+    if data_source not in VALID_DATA_SOURCE:
+        data_source = "extracted"
+
+    input_format = raw.get("input_format", "explicit_data")
+    if input_format not in VALID_INPUT_FORMAT:
+        input_format = "explicit_data"
+
+    print("TESTING data_source:", data_source)
+    print("TESTING input_format:", input_format)
+
     nodes_raw = raw.get("nodes", [])
     nodes = []
     seen_ids: set[str] = set()
@@ -66,18 +78,19 @@ def _validate(raw: dict) -> dict:
         })
 
     if len(nodes) < 2:
-        raise ValueError("Graph must have at least 2 nodes.")
+        raise ValueError(
+            "LLM returned fewer than 2 nodes. If your input was pseudocode/real code/a "
+            "problem statement, the model should have synthesized an example graph — "
+            "try again or check the prompt."
+        )
 
-    # Validate edges
     edges_raw = raw.get("edges", [])
     edges = []
     for e in edges_raw:
         src = str(e.get("source", "")).strip()
         tgt = str(e.get("target", "")).strip()
-        if not src or not tgt:
+        if not src or not tgt or src not in seen_ids or tgt not in seen_ids:
             continue
-        if src not in seen_ids or tgt not in seen_ids:
-            continue  # skip edges referencing unknown nodes
         try:
             weight = float(e.get("weight", 1.0))
         except (TypeError, ValueError):
@@ -96,6 +109,8 @@ def _validate(raw: dict) -> dict:
     return {
         "graph_type":     graph_type,
         "algorithm":      algorithm,
+        "data_source":    data_source,
+        "input_format":   input_format,
         "title":          str(raw.get("title", "Graph"))[:100],
         "directed":       bool(raw.get("directed", False)),
         "source_node":    raw.get("source_node"),
@@ -106,7 +121,6 @@ def _validate(raw: dict) -> dict:
     }
 
 def _run_algorithm(spec: dict) -> dict | None:
-    """Run the graph algorithm and return result metadata."""
     algorithm = spec.get("algorithm", "none")
     if algorithm == "none":
         return None
@@ -114,9 +128,8 @@ def _run_algorithm(spec: dict) -> dict | None:
     try:
         import networkx as nx
     except ImportError:
-        return {"warning": "networkx not installed — skipping algorithm. Run: pip install networkx"}
+        return {"warning": "networkx not installed — run: pip install networkx"}
 
-    # Build NetworkX graph
     G = nx.DiGraph() if spec["directed"] else nx.Graph()
     for node in spec["nodes"]:
         G.add_node(node["id"])
@@ -126,6 +139,7 @@ def _run_algorithm(spec: dict) -> dict | None:
     src = spec.get("source_node")
     tgt = spec.get("target_node")
 
+    print("TESTING algorithm type:", algorithm)
     try:
         if algorithm == "dijkstra":
             if not src:
@@ -135,6 +149,16 @@ def _run_algorithm(spec: dict) -> dict | None:
             path   = nx.dijkstra_path(G, src, tgt, weight="weight")
             length = nx.dijkstra_path_length(G, src, tgt, weight="weight")
             return {"algorithm": "Dijkstra", "path": path, "path_length": round(length, 4)}
+
+        elif algorithm == "bellman_ford":
+            if not src: src = list(G.nodes)[0]
+            if not tgt: tgt = list(G.nodes)[-1]
+            try:
+                path   = nx.bellman_ford_path(G, src, tgt, weight="weight")
+                length = nx.bellman_ford_path_length(G, src, tgt, weight="weight")
+                return {"algorithm": "Bellman-Ford", "path": path, "path_length": round(length, 4)}
+            except nx.NetworkXUnbounded:
+                return {"warning": "Negative-weight cycle detected — no shortest path exists."}
 
         elif algorithm == "bfs":
             source = src or list(G.nodes)[0]
@@ -147,10 +171,16 @@ def _run_algorithm(spec: dict) -> dict | None:
             return {"algorithm": "DFS", "traversal_order": order}
 
         elif algorithm == "kruskal":
-            mst        = nx.minimum_spanning_tree(G.to_undirected(), weight="weight")
-            mst_edges  = [(u, v) for u, v in mst.edges()]
-            total_w    = sum(G[u][v].get("weight", 1) for u, v in mst_edges)
+            mst       = nx.minimum_spanning_tree(G.to_undirected(), weight="weight", algorithm="kruskal")
+            mst_edges = [(u, v) for u, v in mst.edges()]
+            total_w   = sum(G[u][v].get("weight", 1) for u, v in mst_edges)
             return {"algorithm": "Kruskal MST", "mst_edges": mst_edges, "total_weight": round(total_w, 4)}
+
+        elif algorithm == "prim":
+            mst       = nx.minimum_spanning_tree(G.to_undirected(), weight="weight", algorithm="prim")
+            mst_edges = [(u, v) for u, v in mst.edges()]
+            total_w   = sum(G[u][v].get("weight", 1) for u, v in mst_edges)
+            return {"algorithm": "Prim MST", "mst_edges": mst_edges, "total_weight": round(total_w, 4)}
 
         elif algorithm == "pagerank":
             pr = nx.pagerank(G, weight="weight")
@@ -181,14 +211,12 @@ def _apply_algorithm_result(spec: dict, result: dict) -> dict:
     if not result:
         return spec
 
-    # Highlight shortest path edges
     if "path" in result:
         path      = result["path"]
         path_pairs = set(zip(path, path[1:]))
         for edge in spec["edges"]:
             if (edge["source"], edge["target"]) in path_pairs:
                 edge["highlighted"] = True
-        # Tag nodes
         for node in spec["nodes"]:
             if node["id"] in path:
                 node["group"] = (
@@ -197,28 +225,24 @@ def _apply_algorithm_result(spec: dict, result: dict) -> dict:
                     else "path"
                 )
 
-    # Highlight MST edges
     if "mst_edges" in result:
         mst_set = {(u, v) for u, v in result["mst_edges"]}
-        mst_set |= {(v, u) for u, v in result["mst_edges"]} # undirected
+        mst_set |= {(v, u) for u, v in result["mst_edges"]}
         for edge in spec["edges"]:
             if (edge["source"], edge["target"]) in mst_set:
                 edge["highlighted"] = True
 
-    # Apply PageRank
     if "scores" in result:
         max_score = max(result["scores"].values(), default=1)
         for node in spec["nodes"]:
             if node["id"] in result["scores"]:
                 node["value"] = round(result["scores"][node["id"]] / max_score * 25 + 8, 2)
 
-    # Apply community groups
     if "node_community" in result:
         for node in spec["nodes"]:
             if node["id"] in result["node_community"]:
                 node["group"] = str(result["node_community"][node["id"]])
 
-    # Apply traversal order as node value
     if "traversal_order" in result:
         order_map = {nid: i for i, nid in enumerate(result["traversal_order"])}
         for node in spec["nodes"]:
@@ -231,21 +255,16 @@ def _apply_algorithm_result(spec: dict, result: dict) -> dict:
 # === Main entry point ===
 
 async def run_graph_planner(text: str) -> tuple[dict, int]:
-    """Call LLM → extract graph spec → run algorithm → return (graph_spec, tokens_used)."""
     settings = get_settings()
     provider = settings.llm_provider.lower()
 
     system_prompt = SYSTEM
-    user_prompt   = USER.format(text=text[:6000])
+    user_prompt   = USER.format(text=text[:8000])
 
-    # LLM call
     if provider == "gemini":
         import google.generativeai as genai
         genai.configure(api_key=settings.google_api_key)
-        model    = genai.GenerativeModel(
-            model_name=settings.gemini_model,
-            system_instruction=system_prompt,
-        )
+        model    = genai.GenerativeModel(model_name=settings.gemini_model, system_instruction=system_prompt)
         response = model.generate_content(user_prompt)
         raw_text = response.text
         tokens   = int(len((system_prompt + user_prompt + raw_text).split()) * 1.3)
@@ -259,8 +278,10 @@ async def run_graph_planner(text: str) -> tuple[dict, int]:
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_prompt},
             ],
-            temperature=0.1,
+            # documentation in https://console.groq.com/docs/api-reference
+            temperature=0.2,
             max_tokens=4000,
+            response_format={"type": "json_object"},
         )
         raw_text = resp.choices[0].message.content
         tokens   = resp.usage.total_tokens if resp.usage else 0

@@ -42,4 +42,17 @@ Provider is selected by LLM_PROVIDER in .env
 Extracts structured chart data from text using the configured LLM provider.
 Returns a chart spec: { chart_type, title, x_label, y_label, data: [{label, value}] }
 
+# flow
+POST /generate-graph
+1. main.py: generate_graph -> try: run_graph_planner
+2. graph_planner.py: 
+  2.1 run_graph_planner -> (with provider groq)
+  2.2 raw = _extract_json
+  2.3 spec = _validate
+  2.4 algo_result = _run_algorithm
+  2.5 run_graph_planner -> spec = _apply_algorithm_result(spec, algo_result)
+  2.6 _apply_algorithm_result(spec, algo_result) -> return spec
+  2.7 run_graph_planner -> return spec, tokens
+3. main.py: generate_graph -> return {"job_id": job_id, "graph": spec, "tokens_used": tokens}
+
 
