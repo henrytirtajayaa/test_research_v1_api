@@ -2,12 +2,12 @@ from __future__ import annotations
 import json, re
 from app.config import get_settings
 from app.prompts.graph_planner import SYSTEM, USER
-
+from app.utils.explanatory_utility import compute_explanatory_utility
 
 # === JSON extractor ===
 
 def _extract_json(text: str) -> dict:
-    text = re.sub(r'```(?:json)?', '', text).strip().replace('```', '').strip()
+    text = re.sub(r'(?:json)?', '', text).strip().replace('', '').strip()
 
     try:
         return json.loads(text)
@@ -33,13 +33,13 @@ def _extract_json(text: str) -> dict:
 
     raise ValueError(f"Could not extract JSON from LLM response:\n{text[:400]}")
 
-
 # === Validator ===
 
 def _validate(raw: dict) -> dict:
     VALID_GRAPH_TYPES = {"force_directed", "shortest_path", "tree", "dag", "heatmap"}
-    VALID_ALGORITHMS  = {"dijkstra", "bellman_ford", "bfs", "dfs", "kruskal", "prim",
-                         "pagerank", "community", "topological", "floyd", "none"}
+    VALID_ALGORITHMS = {"dijkstra", "bellman_ford", "bfs", "dfs", "kruskal", "prim",
+                        "mst_replacement", "pagerank", "community", "topological",
+                        "floyd", "none"}
     VALID_DATA_SOURCE = {"extracted", "synthesized"}
     VALID_INPUT_FORMAT = {"explicit_data", "pseudocode", "real_code", "natural_language_problem"}
 
@@ -182,6 +182,10 @@ def _run_algorithm(spec: dict) -> dict | None:
             total_w   = sum(G[u][v].get("weight", 1) for u, v in mst_edges)
             return {"algorithm": "Prim MST", "mst_edges": mst_edges, "total_weight": round(total_w, 4)}
 
+        elif algorithm == "mst_replacement":
+            root = src or list(G.nodes)[0]
+            return _compute_mst_replacement(G, root)
+
         elif algorithm == "pagerank":
             pr = nx.pagerank(G, weight="weight")
             return {"algorithm": "PageRank", "scores": {k: round(v, 6) for k, v in pr.items()}}
@@ -205,6 +209,81 @@ def _run_algorithm(spec: dict) -> dict | None:
 
     return None
 
+def _compute_mst_replacement(G, root: str) -> dict:
+    """
+    Static snapshot of an MST + per-node replacement edges.
+
+    NOTE: This reproduces the STRUCTURE shown in DMST-style figures (e.g. SIGMOD 2025,
+    Xu et al., "Minimum Spanning Tree Maintenance in Dynamic Graphs" Fig. 2) as a
+    one-shot snapshot computation. It does NOT implement that paper's actual dynamic
+    maintenance algorithm (which achieves sub-linear update time via specialized
+    tree structures). This is a brute-force O(V*E) recomputation from scratch —
+    correct for validating the STATIC artifact, not a reimplementation of the
+    paper's incremental-update contribution.
+    """
+    Gu = G.to_undirected() if G.is_directed() else G
+    mst = nx.minimum_spanning_tree(Gu, weight="weight", algorithm="kruskal")
+
+    # Build rooted parent map via BFS over the MST
+    parent = {root: None}
+    weight_to_parent = {root: None}
+    queue = [root]
+    visited = {root}
+    while queue:
+        u = queue.pop(0)
+        for v in mst.neighbors(u):
+            if v not in visited:
+                visited.add(v)
+                parent[v] = u
+                weight_to_parent[v] = mst[u][v].get("weight", 1.0)
+                queue.append(v)
+
+    children: dict[str, list[str]] = {n: [] for n in mst.nodes}
+    for v, p in parent.items():
+        if p is not None:
+            children[p].append(v)
+
+    def subtree_nodes(u: str) -> set[str]:
+        stack, seen = [u], set()
+        while stack:
+            x = stack.pop()
+            if x in seen:
+                continue
+            seen.add(x)
+            stack.extend(children[x])
+        return seen
+
+    mst_edge_set = {(u, v) for u, v in mst.edges()} | {(v, u) for u, v in mst.edges()}
+
+    replacement: dict[str, dict | None] = {}
+    for v in mst.nodes:
+        p = parent[v]
+        if p is None:
+            replacement[v] = None
+            continue
+        sub = subtree_nodes(v)
+        best_edge, best_w = None, float("inf")
+        for a, b, data in Gu.edges(data=True):
+            if (a, b) in mst_edge_set:
+                continue
+            w = data.get("weight", 1.0)
+            if (a in sub) != (b in sub) and w < best_w:  # crosses the cut
+                best_w, best_edge = w, (a, b, w)
+        replacement[v] = {"edge": best_edge[:2], "weight": best_edge[2]} if best_edge else None
+
+    total_weight = sum(d["weight"] for _, _, d in mst.edges(data=True))
+
+    return {
+        "algorithm":          "MST + Replacement Edges (static DMST snapshot)",
+        "root":               root,
+        "mst_edges":          list(mst.edges()),
+        "total_weight":       round(total_weight, 4),
+        "parent":             parent,
+        "weight_to_parent":   {k: (round(v, 4) if v is not None else None) for k, v in weight_to_parent.items()},
+        "replacement_edges":  replacement,
+        "note": ("Static snapshot only — does not implement the paper's incremental "
+                 "maintenance algorithm under edge deletions."),
+    }
 
 def _apply_algorithm_result(spec: dict, result: dict) -> dict:
     """Highlight edges/nodes based on algorithm result."""
@@ -249,8 +328,27 @@ def _apply_algorithm_result(spec: dict, result: dict) -> dict:
             if node["id"] in order_map:
                 node["value"] = order_map[node["id"]]
 
-    return spec
+    if "parent" in result and "weight_to_parent" in result:
+        rep_map = result.get("replacement_edges", {})
+        mst_edges_set = {(u, v) for u, v in result.get("mst_edges", [])}
+        mst_edges_set |= {(v, u) for u, v in result.get("mst_edges", [])}
 
+        for node in spec["nodes"]:
+            nid = node["id"]
+            node["parent"] = result["parent"].get(nid)
+            node["weight_to_parent"] = result["weight_to_parent"].get(nid)
+            rep = rep_map.get(nid)
+            if rep and rep.get("edge"):
+                a, b = rep["edge"]
+                node["rep_edge"] = f"{a}\u2013{b} (w={rep['weight']})"
+            else:
+                node["rep_edge"] = None
+
+        for edge in spec["edges"]:
+            if (edge["source"], edge["target"]) in mst_edges_set:
+                edge["highlighted"] = True
+
+    return spec
 
 # === Main entry point ===
 
@@ -329,5 +427,6 @@ async def run_graph_planner(text: str) -> tuple[dict, int]:
     if algo_result:
         spec = _apply_algorithm_result(spec, algo_result)
         spec["algorithm_result"] = algo_result
+        spec["explanatory_utility"] = compute_explanatory_utility(spec, spec.get("algorithm_result"))
 
     return spec, tokens

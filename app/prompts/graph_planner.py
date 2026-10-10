@@ -6,32 +6,28 @@ You can understand ANY of these input types:
   B) Adjacency/distance matrices — CONCRETE data
   C) Social network descriptions — CONCRETE data
   D) Algorithm pseudocode (CLRS-style, Python-like, plain English) — usually NO concrete data
-  E) Real source code in ANY programming language (C++, Java, Python, JavaScript, Go, Rust,
-     etc.) implementing a graph algorithm — usually NO concrete data, the function is generic
-  F) Natural-language problem statements (LeetCode / GeeksforGeeks / HackerRank style) that
-     describe a computational task on a graph WITHOUT naming the algorithm or giving data
+  E) Real source code in ANY programming language (C++, Java, Python, JavaScript, Go, Rust, etc.) implementing a graph algorithm — usually NO concrete data, the function is generic
+  F) Natural-language problem statements (LeetCode / GeeksforGeeks / HackerRank style) that describe a computational task on a graph WITHOUT naming the algorithm or giving data
      (e.g. "Given a weighted graph, find the shortest distance of all vertices from source src")
 
 CRITICAL RULE — read carefully:
-If the input does NOT contain any actual node names or edge values (this is true for D, E,
-and F above), you MUST invent a representative example graph yourself. Do not refuse and do
-not return an empty graph. The synthesized graph must:
-  - Have 6-10 nodes with short labels (A, B, C... or short names, or 0,1,2... if the input
-    uses integer-indexed vertices like "V vertices numbered 0 to V-1")
+If the input does NOT contain any actual node names or edge values (this is true for D, E, and F above), you MUST invent a representative example graph yourself. Do not refuse and do not return an empty graph. The synthesized graph must:
+  - Have 6-10 nodes with short labels (A, B, C... or short names, or 0,1,2... if the input uses integer-indexed vertices like "V vertices numbered 0 to V-1")
   - Meaningfully exercise the algorithm:
       * shortest-path algorithms -> include >=2 different routes between source and target
       * MST algorithms (Kruskal/Prim) -> include >=1 cycle so there are real choices to make
       * traversal algorithms (BFS/DFS) -> include branching so order is non-trivial
       * PageRank -> include a node with multiple incoming edges
       * community detection -> include >=2 loosely-connected clusters
+      * mst_replacement -> include at least one non-tree edge that could serve as a
+        replacement if a tree edge were removed (i.e., the graph must have E > V-1 edges,
+        with at least one "backup" connection between components the MST would create)
   - Use plausible positive edge weights unless the algorithm/problem explicitly allows negative
 
-RECOGNIZING THE ALGORITHM FROM REAL CODE (input type E) — match by LOGIC, not syntax,
-since the same algorithm can be written in any language:
-  - priority_queue/min-heap + relaxation "if dist[u]+w < dist[v]" + non-negative weights
+RECOGNIZING THE ALGORITHM FROM REAL CODE (input type E) — match by LOGIC, not syntax, since the same algorithm can be written in any language:
+  - priority_queue/min-heap + relaxation "if dist[u]+w < dist[v]" + non-negative weights 
        -> dijkstra
-  - same relaxation pattern, but it explicitly loops over ALL edges V-1 times, or the
-    problem/code mentions negative weights or "negative cycle"
+  - same relaxation pattern, but it explicitly loops over ALL edges V-1 times, or the problem/code mentions negative weights or "negative cycle"
        -> bellman_ford
   - FIFO queue + visited array, processed level by level
        -> bfs
@@ -47,6 +43,8 @@ since the same algorithm can be written in any language:
        -> pagerank
   - in-degree counting + queue/stack of zero-indegree nodes
        -> topological
+  - edges sorted by weight + union-find, PLUS the input mentions "replacement edge", "backup edge", "what if an edge is deleted", "dynamic MST", "MST maintenance"
+       -> mst_replacement
 
 RECOGNIZING THE ALGORITHM FROM PROBLEM STATEMENTS (input type F) — infer from the
 description even if no algorithm is named:
@@ -64,6 +62,8 @@ description even if no algorithm is named:
        -> pagerank
   - "order of tasks given dependencies/prerequisites"
        -> topological
+  - edges sorted by weight + union-find, PLUS the input mentions "replacement edge", "backup edge", "what if an edge is deleted", "dynamic MST", "MST maintenance"
+       -> mst_replacement
 
 Determine the best visualization type:
   - "force_directed" : general networks, social graphs, MST (Kruskal/Prim), unweighted graphs
@@ -74,8 +74,7 @@ Determine the best visualization type:
 
 Always set "data_source" to:
   - "extracted"   if concrete nodes/edges/weights were explicitly stated in the input
-  - "synthesized" if you invented the graph yourself (true for most pseudocode, real code,
-                    and problem statements — types D, E, F above)
+  - "synthesized" if you invented the graph yourself (true for most pseudocode, real code, and problem statements — types D, E, F above)
 
 Always set "input_format" to whichever best describes the raw input you received:
   - "explicit_data"            : input A, B, or C (literal graph/matrix data given)
@@ -100,7 +99,7 @@ Input: {text}
 Return JSON matching this exact schema:
 {{
   "graph_type":  "force_directed | shortest_path | tree | dag | heatmap",
-  "algorithm":   "dijkstra | bellman_ford | bfs | dfs | kruskal | prim | pagerank | community | topological | floyd | none",
+  "algorithm":   "dijkstra | bellman_ford | bfs | dfs | kruskal | prim | mst_replacement | pagerank | community | topological | floyd | none",
   "data_source": "extracted | synthesized",
   "input_format": "explicit_data | pseudocode | real_code | natural_language_problem",
   "title": "descriptive title",

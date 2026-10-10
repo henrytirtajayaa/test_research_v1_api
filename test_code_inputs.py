@@ -40,7 +40,7 @@ vector<int> dijkstra(vector<vector<pair<int,int>>>& adj, int src) {
 
 TESTS = [
     ("LeetCode/GFG-style problem statement", CODE_STYLE),
-    ("Real C++ Dijkstra implementation",     CPP_DIJKSTRA),
+    ("C++ Code Dijkstra implementation",     CPP_DIJKSTRA),
 ]
 
 async def main():
