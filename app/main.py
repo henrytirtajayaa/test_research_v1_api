@@ -12,6 +12,8 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 
+from app.agents.pseudocode_planner import run_pseudocode_graph_planner
+
 import os
 print("GROQ_BASE_URL:", os.environ.get("GROQ_BASE_URL"))
 print("OPENAI_BASE_URL:", os.environ.get("OPENAI_BASE_URL"))
@@ -160,6 +162,33 @@ async def generate_graph(request: GraphRequest):
     """
     try:
         spec, tokens = await run_graph_planner(request.text)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM error: {e}")
+
+    job_id = str(uuid.uuid4())[:8]
+    _results[job_id] = {
+        "type":          "graph",
+        "graph":         spec,
+        "tokens_used":   tokens,
+        "created_at":    datetime.now(timezone.utc).isoformat(),
+        "input_preview": request.text[:200],
+    }
+    return {"job_id": job_id, "graph": spec, "tokens_used": tokens}
+
+@app.post(
+    "/generate-graph-pseudocode",
+    status_code=status.HTTP_200_OK,
+    tags=["Generation"],
+    summary="Same as /generate-graph, but converts the input to pseudocode first (Method 2)",
+)
+async def generate_graph_pseudocode(request: GraphRequest):
+    """Converts the input to pseudocode, then runs the graph planner on the original
+    input plus the pseudocode. The graph spec also contains `original_input`,
+    `pseudocode` and `pseudocode_status`."""
+    try:
+        spec, tokens = await run_pseudocode_graph_planner(request.text)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:

@@ -1,0 +1,10 @@
+[
+  {"name": "dijkstra_explicit", "input_type": "explicit_data", "expected_algorithm": "dijkstra",
+   "text": "graph = {'A': {'B': 4, 'C': 2}, 'B': {'D': 5}, 'C': {'B': 1, 'D': 8}, 'D': {}} Find shortest path from A to D using Dijkstra."},
+  {"name": "shortest_distance_leetcode", "input_type": "natural_language_problem", "expected_algorithm": "dijkstra",
+   "text": "Given a weighted, undirected graph of V vertices numbered 0 to V-1 and a source vertex src, find the shortest distance of all vertices from src."},
+  {"name": "kruskal_pseudocode", "input_type": "pseudocode", "expected_algorithm": "kruskal",
+   "text": "KRUSKAL(G): A = empty set; for each vertex v: MAKE-SET(v); sort edges of G by weight; for each edge (u,v) in order: if FIND-SET(u) != FIND-SET(v): add (u,v) to A; UNION(u,v); return A"},
+  {"name": "topological_cpp", "input_type": "real_code", "expected_algorithm": "topological",
+   "text": "vector<int> order; queue<int> q; for (int i = 0; i < n; i++) if (indeg[i] == 0) q.push(i); while (!q.empty()) { int u = q.front(); q.pop(); order.push_back(u); for (int v : adj[u]) if (--indeg[v] == 0) q.push(v); } return order;"}
+]
